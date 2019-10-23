@@ -38,13 +38,11 @@ module Xray
         status, headers, response = @app.call(env)
 
         if html_headers?(status, headers) && body = response_body(response)
-          if body =~ script_matcher('xray')
-            # Inject the xray bar if xray.js is already on the page
+          if Rails.application.config.assets.debug
             inject_xray_bar!(body)
-          elsif Rails.application.config.assets.debug
-            # Otherwise try to inject xray.js if assets are unbundled
-            if append_js!(body, 'jquery', 'xray')
-              inject_xray_bar!(body)
+            # don't inject js if there is already one
+            unless body =~ script_matcher('xray')
+              append_js!(body, 'xray', defer: true)
             end
           end
 
@@ -74,10 +72,6 @@ module Xray
 
     def committed?(response)
       response.respond_to?(:committed?) && response.committed?
-    end
-
-    def inject_xray_bar!(html)
-      html.sub!(/<body[^>]*>/) { "#{$~}\n#{render_xray_bar}" }
     end
 
     def render_xray_bar
@@ -110,11 +104,19 @@ module Xray
       /x
     end
 
-    # Appends the given `script_name` after the `after_script_name`.
-    def append_js!(html, after_script_name, script_name)
-      html.sub!(script_matcher(after_script_name)) do
-        "#{$~}\n" + helper.javascript_include_tag(script_name)
+    def append_html(html, content = '')
+      html.sub!(/<\/body>/) do
+        content + "\n#{$~}".html_safe
       end
+    end
+
+    def inject_xray_bar!(html)
+      append_html(html, render_xray_bar)
+    end
+
+    # Appends the given `script_name` after the `after_script_name`.
+    def append_js!(html, script_name, **options)
+      append_html(html, helper.javascript_include_tag(script_name, **options))
     end
 
     def helper
