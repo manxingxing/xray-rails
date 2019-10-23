@@ -42,7 +42,7 @@ module Xray
             inject_xray_bar!(body)
             # don't inject js if there is already one
             unless body =~ script_matcher('xray')
-              append_js!(body, 'xray', defer: true)
+              append_js!(body, 'xray', defer: true, 'data-turbolinks-eval' => false)
             end
           end
 
@@ -115,8 +115,8 @@ module Xray
     end
 
     # Appends the given `script_name` after the `after_script_name`.
-    def append_js!(html, script_name, **options)
-      append_html(html, helper.javascript_include_tag(script_name, **options))
+    def append_js!(html, script_name, *options)
+      append_html(html, helper.javascript_include_tag(script_name, *options))
     end
 
     def helper
